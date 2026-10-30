@@ -1,0 +1,26 @@
+name: Mirror PTB-XL
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Download PTB-XL 1.0.3 (500 Hz) from PhysioNet's AWS open-data bucket
+        run: |
+          aws s3 sync --no-sign-request --only-show-errors \
+            s3://physionet-open/ptb-xl/1.0.3/ ptb-xl --exclude "records100/*"
+          du -sh ptb-xl
+      - name: Pack into parts under 2 GB
+        run: |
+          tar -czf - ptb-xl | split -b 1900m -d - ptbxl500.tar.gz.part
+          ls -la ptbxl500.tar.gz.part*
+      - name: Publish as a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v1 ptbxl500.tar.gz.part* --repo "$GITHUB_REPOSITORY" \
+            --title "PTB-XL 1.0.3 (500 Hz) mirror" \
+            --notes "PTB-XL 1.0.3 from PhysioNet (CC BY 4.0). Wagner et al., Scientific Data 2020."
